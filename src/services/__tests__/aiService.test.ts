@@ -48,6 +48,37 @@ describe('aiService (Local Intelligence Parser Fallbacks)', () => {
       const highRiskClauses = result.clauses.filter(c => c.riskLevel === 'high');
       expect(highRiskClauses.length).toBeGreaterThanOrEqual(1);
     });
+
+    it('returns a low-risk analysis for a benign agreement', async () => {
+      const simpleAgreement = `PARTIES
+This Service Agreement is between Acme Labs and Bright Pixel Studio.
+
+SECTION 1. SCOPE
+The Supplier will provide design services for a fixed monthly fee of $2,000.
+
+SECTION 2. PAYMENT
+The Client shall pay the invoice within 30 days of receipt.
+
+SECTION 3. CONFIDENTIALITY
+Each party will keep non-public information confidential for 12 months after termination.`;
+
+      const result = await analyzeDocument(simpleAgreement, 'Simple Service Agreement');
+      expect(result.overallRiskLevel).toBe('low');
+      expect(result.keyTakeaways.length).toBeGreaterThan(0);
+      expect(result.deadlines.length).toBeGreaterThanOrEqual(0);
+    });
+
+    it('detects obligations and notice deadlines in a renewal-heavy contract', async () => {
+      const renewalDoc = `SECTION 1. NOTICE
+Either party must provide written notice at least 60 days before termination.
+
+SECTION 2. RENEWAL
+The agreement renews automatically for one year unless the client sends notice 30 days before expiry.`;
+
+      const result = await analyzeDocument(renewalDoc, 'Renewal Notice Contract');
+      expect(result.obligations.length).toBeGreaterThan(0);
+      expect(result.deadlines.some(d => d.type === 'notice')).toBe(true);
+    });
   });
 
   describe('chatWithDocument', () => {
@@ -55,6 +86,12 @@ describe('aiService (Local Intelligence Parser Fallbacks)', () => {
       const res = await chatWithDocument(sampleDoc, [], 'Can I terminate early?');
       expect(res.text).toBeTruthy();
       expect(Array.isArray(res.citations)).toBe(true);
+    });
+
+    it('returns a helpful fallback response for payment-related questions', async () => {
+      const res = await chatWithDocument(sampleDoc, [], 'What are the payment obligations?');
+      expect(res.text).toContain('financial');
+      expect(res.citations.length).toBeGreaterThanOrEqual(0);
     });
   });
 
@@ -65,6 +102,19 @@ describe('aiService (Local Intelligence Parser Fallbacks)', () => {
       expect(brief.criticalQuestions.length).toBeGreaterThan(0);
       expect(brief.recommendedAmendments.length).toBeGreaterThan(0);
     });
+
+    it('creates a useful brief even for agreement without obvious red flags', async () => {
+      const simpleAgreement: LegalDocument = {
+        ...sampleDoc,
+        id: 'simple-agreement',
+        title: 'Simple SaaS Agreement',
+        content: 'This agreement allows subscription access for one year. The customer may cancel with 30 days notice. Payment is due monthly.'
+      };
+
+      const brief = await generateLawyerBrief(simpleAgreement);
+      expect(brief.documentTitle).toBe('Simple SaaS Agreement');
+      expect(brief.suggestedNextSteps.length).toBeGreaterThan(0);
+    });
   });
 
   describe('compareDocuments', () => {
@@ -73,6 +123,12 @@ describe('aiService (Local Intelligence Parser Fallbacks)', () => {
       expect(comp.doc1Id).toBe(sampleDoc.id);
       expect(comp.doc2Id).toBe(sampleDoc2.id);
       expect(comp.comparisonSummary).toBeTruthy();
+    });
+
+    it('identifies increased risk in the second version of a contract', async () => {
+      const comp = await compareDocuments(sampleDoc, sampleDoc2);
+      expect(comp.modifiedClauses.some(change => change.riskDelta === 'increased')).toBe(true);
+      expect(comp.overallRecommendation).toBeTruthy();
     });
   });
 });

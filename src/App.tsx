@@ -16,6 +16,28 @@ import { LawyerPrepTab } from './components/LawyerPrepTab';
 
 import { Sparkles, AlertTriangle, GitCompare, MessageSquare, CheckSquare, Briefcase, FileText, Plus, Columns, Maximize2 } from 'lucide-react';
 
+const API_KEY_STORAGE_KEY = 'GEMINI_API_KEY';
+
+const readStoredApiKey = (): string => {
+  try {
+    const sessionKey = window.sessionStorage.getItem(API_KEY_STORAGE_KEY);
+    if (sessionKey) return sessionKey;
+
+    const legacyKey = window.localStorage.getItem(API_KEY_STORAGE_KEY);
+    if (legacyKey) {
+      window.sessionStorage.setItem(API_KEY_STORAGE_KEY, legacyKey);
+      window.localStorage.removeItem(API_KEY_STORAGE_KEY);
+      return legacyKey;
+    }
+  } catch {
+    // Ignore storage access failures and continue without persisted key
+  }
+
+  return '';
+};
+
+const sanitizeApiKeyInput = (value: string): string => value.replace(/\s+/g, '').slice(0, 200);
+
 interface TabItem {
   id: 'summary' | 'risk' | 'compare' | 'chat' | 'checklist' | 'lawyer';
   label: string;
@@ -30,7 +52,7 @@ export function App() {
   const [activeTab, setActiveTab] = useState<'summary' | 'risk' | 'compare' | 'chat' | 'checklist' | 'lawyer'>('summary');
   
   const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
-  const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem('GEMINI_API_KEY') || '');
+  const [apiKey, setApiKey] = useState<string>(() => readStoredApiKey());
 
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isApiKeyOpen, setIsApiKeyOpen] = useState(false);
@@ -47,11 +69,19 @@ export function App() {
   };
 
   const handleSaveApiKey = (key: string) => {
-    setApiKey(key);
-    if (key) {
-      localStorage.setItem('GEMINI_API_KEY', key);
-    } else {
-      localStorage.removeItem('GEMINI_API_KEY');
+    const normalizedKey = sanitizeApiKeyInput(key);
+    setApiKey(normalizedKey);
+
+    try {
+      if (normalizedKey) {
+        window.sessionStorage.setItem(API_KEY_STORAGE_KEY, normalizedKey);
+        window.localStorage.removeItem(API_KEY_STORAGE_KEY);
+      } else {
+        window.sessionStorage.removeItem(API_KEY_STORAGE_KEY);
+        window.localStorage.removeItem(API_KEY_STORAGE_KEY);
+      }
+    } catch {
+      // Ignore storage failures and keep the key in application state only
     }
   };
 

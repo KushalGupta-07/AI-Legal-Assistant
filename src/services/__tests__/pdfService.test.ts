@@ -20,6 +20,14 @@ describe('pdfService', () => {
       expect(output).toContain('SECTION 1.');
       expect(output).toContain('General Agreement');
     });
+
+    it('removes control characters and preserves readable contract text', () => {
+      const raw = 'SECTION 1\u0000. Confidentiality\u0001.\nThe parties agree to maintain secrecy.';
+      const clean = sanitizeToHumanReadableText(raw);
+      expect(clean).toContain('Confidentiality');
+      expect(clean).not.toContain('\u0000');
+      expect(clean).not.toContain('\u0001');
+    });
   });
 
   describe('extractTextFromFile', () => {
@@ -33,6 +41,13 @@ describe('pdfService', () => {
       const file = new File(['{"title": "Agreement", "terms": "Standard lease terms"}'], 'terms.json', { type: 'application/json' });
       const text = await extractTextFromFile(file);
       expect(text).toContain('Standard lease terms');
+    });
+
+    it('sanitizes markdown files into readable legal text', async () => {
+      const file = new File(['# Master Services Agreement\n\n## Term\nCustomer shall pay within 30 days.'], 'msa.md', { type: 'text/markdown' });
+      const text = await extractTextFromFile(file);
+      expect(text).toContain('Master Services Agreement');
+      expect(text).toContain('Customer shall pay within 30 days');
     });
   });
 });

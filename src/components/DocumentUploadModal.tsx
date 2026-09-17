@@ -13,6 +13,26 @@ interface DocumentUploadModalProps {
 }
 
 const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
+const ALLOWED_FILE_EXTENSIONS = new Set(['pdf', 'txt', 'docx', 'md', 'json']);
+const ALLOWED_MIME_TYPES = new Set([
+  'application/pdf',
+  'text/plain',
+  'text/markdown',
+  'application/json',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/msword'
+]);
+
+const isAllowedFile = (file: File): boolean => {
+  const extension = file.name.split('.').pop()?.toLowerCase();
+  const mimeType = file.type.toLowerCase();
+
+  if (!extension || !ALLOWED_FILE_EXTENSIONS.has(extension)) {
+    return false;
+  }
+
+  return !mimeType || mimeType === 'application/octet-stream' || ALLOWED_MIME_TYPES.has(mimeType);
+};
 
 export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   isOpen,
@@ -42,6 +62,11 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   if (!isOpen) return null;
 
   const handleFileUpload = async (file: File) => {
+    if (!isAllowedFile(file)) {
+      setErrorMessage('Unsupported file type. Please upload a PDF, DOCX, TXT, MD, or JSON file.');
+      return;
+    }
+
     if (file.size > MAX_FILE_SIZE_BYTES) {
       setErrorMessage(`File "${file.name}" exceeds the 25MB maximum size limit.`);
       return;

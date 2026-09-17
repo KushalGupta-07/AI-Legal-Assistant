@@ -13,11 +13,20 @@ import type {
   RiskLevel
 } from '../types/legal';
 
+const API_KEY_STORAGE_KEY = 'GEMINI_API_KEY';
+
+const sanitizeApiKey = (value: string): string => value.trim().replace(/\s+/g, '').slice(0, 200);
+
 // Initialize Gemini Client if key exists
 function getGeminiClient(apiKey?: string): GoogleGenAI | null {
-  const key = apiKey || localStorage.getItem('GEMINI_API_KEY') || import.meta.env.VITE_GEMINI_API_KEY;
-  if (!key || !key.trim()) return null;
-  return new GoogleGenAI({ apiKey: key.trim() });
+  const rawKey = apiKey || (typeof window !== 'undefined' ? window.sessionStorage.getItem(API_KEY_STORAGE_KEY) : '') || import.meta.env.VITE_GEMINI_API_KEY;
+  const key = sanitizeApiKey(rawKey || '');
+
+  if (!key || !/^AIza[0-9A-Za-z-_]{10,}$/.test(key)) {
+    return null;
+  }
+
+  return new GoogleGenAI({ apiKey: key });
 }
 
 /**
