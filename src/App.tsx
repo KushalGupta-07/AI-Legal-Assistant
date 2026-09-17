@@ -121,12 +121,13 @@ export function App() {
               {/* Split View Toggle */}
               <button
                 onClick={() => setIsSplitView(!isSplitView)}
-                className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition flex items-center space-x-1.5 ${
+                className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition flex items-center space-x-1.5 focus-visible:ring-2 focus-visible:ring-blue-500 ${
                   isSplitView
                     ? 'bg-blue-600/20 text-blue-300 border-blue-500/40'
                     : 'bg-slate-800 text-slate-300 border-slate-700 hover:text-white'
                 }`}
                 title="Toggle Side-by-Side Split View"
+                aria-label={isSplitView ? 'Disable split view' : 'Enable side-by-side split view'}
               >
                 {isSplitView ? <Columns className="w-4 h-4 text-blue-400" /> : <Maximize2 className="w-4 h-4" />}
                 <span className="hidden sm:inline">{isSplitView ? 'Split View Active' : 'Full Tab View'}</span>
@@ -134,7 +135,8 @@ export function App() {
 
               <button
                 onClick={() => setIsUploadOpen(true)}
-                className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition flex items-center space-x-1 shadow-md shadow-blue-600/20"
+                className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition flex items-center space-x-1 shadow-md shadow-blue-600/20 focus-visible:ring-2 focus-visible:ring-blue-400"
+                aria-label="Upload another contract"
               >
                 <Plus className="w-4 h-4" />
                 <span>Upload Another</span>
@@ -144,15 +146,23 @@ export function App() {
         )}
 
         {/* Tab Navigation */}
-        <div className="flex items-center space-x-1.5 overflow-x-auto pb-2 border-b border-slate-800 scrollbar-none">
+        <div 
+          className="flex items-center space-x-1.5 overflow-x-auto pb-2 border-b border-slate-800 scrollbar-none"
+          role="tablist"
+          aria-label="Analysis section tabs"
+        >
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
+                role="tab"
+                aria-selected={isActive}
+                aria-controls={`panel-${tab.id}`}
+                id={`tab-${tab.id}`}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center space-x-2 flex-shrink-0 ${
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center space-x-2 flex-shrink-0 focus-visible:ring-2 focus-visible:ring-blue-500 ${
                   isActive
                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
                     : 'bg-slate-900/60 hover:bg-slate-800 text-slate-300 border border-slate-800'
@@ -188,39 +198,51 @@ export function App() {
           {/* Right Column / Full Width: Analysis Tabs */}
           <div className={isSplitView && activeDocument ? 'lg:col-span-7 space-y-6' : 'space-y-6'}>
             {activeTab === 'summary' && activeDocument && (
-              <SummaryTab
-                document={activeDocument}
-                onNavigateToRisk={() => setActiveTab('risk')}
-                onNavigateToPrep={() => setActiveTab('lawyer')}
-              />
+              <div id="panel-summary" role="tabpanel" aria-labelledby="tab-summary">
+                <SummaryTab
+                  document={activeDocument}
+                  onNavigateToRisk={() => setActiveTab('risk')}
+                  onNavigateToPrep={() => setActiveTab('lawyer')}
+                />
+              </div>
             )}
 
             {activeTab === 'risk' && activeDocument && (
-              <RiskMatrixTab document={activeDocument} />
+              <div id="panel-risk" role="tabpanel" aria-labelledby="tab-risk">
+                <RiskMatrixTab document={activeDocument} />
+              </div>
             )}
 
             {activeTab === 'compare' && (
-              <CompareTab
-                documents={documents}
-                activeDocument={activeDocument}
-                apiKey={apiKey}
-              />
+              <div id="panel-compare" role="tabpanel" aria-labelledby="tab-compare">
+                <CompareTab
+                  documents={documents}
+                  activeDocument={activeDocument}
+                  apiKey={apiKey}
+                />
+              </div>
             )}
 
             {activeTab === 'chat' && activeDocument && (
-              <ChatTab
-                document={activeDocument}
-                apiKey={apiKey}
-                onOpenViewer={() => setIsViewerOpen(true)}
-              />
+              <div id="panel-chat" role="tabpanel" aria-labelledby="tab-chat">
+                <ChatTab
+                  document={activeDocument}
+                  apiKey={apiKey}
+                  onOpenViewer={() => setIsViewerOpen(true)}
+                />
+              </div>
             )}
 
             {activeTab === 'checklist' && activeDocument && (
-              <ChecklistTab document={activeDocument} />
+              <div id="panel-checklist" role="tabpanel" aria-labelledby="tab-checklist">
+                <ChecklistTab document={activeDocument} />
+              </div>
             )}
 
             {activeTab === 'lawyer' && activeDocument && (
-              <LawyerPrepTab document={activeDocument} apiKey={apiKey} />
+              <div id="panel-lawyer" role="tabpanel" aria-labelledby="tab-lawyer">
+                <LawyerPrepTab document={activeDocument} apiKey={apiKey} />
+              </div>
             )}
           </div>
         </div>

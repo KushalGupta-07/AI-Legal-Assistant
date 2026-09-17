@@ -6,14 +6,19 @@ export const DisclaimerBanner: React.FC = () => {
 
   if (dismissed) {
     return (
-      <div className="bg-amber-950/40 border-b border-amber-500/20 px-4 py-1 flex items-center justify-between text-[11px] text-amber-300/80">
+      <div 
+        className="bg-amber-950/40 border-b border-amber-500/20 px-4 py-1 flex items-center justify-between text-[11px] text-amber-300/80"
+        role="region"
+        aria-label="Collapsed legal disclaimer"
+      >
         <div className="flex items-center space-x-1.5">
           <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
           <span>Notice: General Legal Information & AI Assistance — Not Professional Legal Advice.</span>
         </div>
         <button 
           onClick={() => setDismissed(false)}
-          className="underline text-amber-400 hover:text-amber-200"
+          className="underline text-amber-400 hover:text-amber-200 focus-visible:ring-2 focus-visible:ring-amber-400 rounded"
+          aria-label="View full legal disclaimer notice"
         >
           View Full Disclaimer
         </button>
@@ -22,7 +27,11 @@ export const DisclaimerBanner: React.FC = () => {
   }
 
   return (
-    <div className="bg-gradient-to-r from-amber-950/80 via-slate-900 to-amber-950/80 border-b border-amber-500/30 px-4 lg:px-8 py-2.5 flex items-center justify-between text-xs text-amber-200 shadow-md">
+    <div 
+      className="bg-gradient-to-r from-amber-950/80 via-slate-900 to-amber-950/80 border-b border-amber-500/30 px-4 lg:px-8 py-2.5 flex items-center justify-between text-xs text-amber-200 shadow-md"
+      role="region"
+      aria-label="Important legal disclaimer"
+    >
       <div className="flex items-center space-x-3">
         <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-400 flex-shrink-0">
           <AlertTriangle className="w-4 h-4" />
@@ -33,8 +42,9 @@ export const DisclaimerBanner: React.FC = () => {
       </div>
       <button
         onClick={() => setDismissed(true)}
-        className="p-1 text-amber-400 hover:text-amber-200 rounded-lg hover:bg-amber-500/10 transition ml-4 flex-shrink-0"
+        className="p-1 text-amber-400 hover:text-amber-200 rounded-lg hover:bg-amber-500/10 transition ml-4 flex-shrink-0 focus-visible:ring-2 focus-visible:ring-amber-400"
         title="Dismiss notice"
+        aria-label="Dismiss legal notice banner"
       >
         <X className="w-4 h-4" />
       </button>

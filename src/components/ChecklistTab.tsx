@@ -21,10 +21,11 @@ export const ChecklistTab: React.FC<ChecklistTabProps> = ({ document }) => {
   };
 
   const handleExportJSON = () => {
+    const safeTitle = document.title.replace(/[^a-zA-Z0-9_-]/g, '_');
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(deadlines, null, 2));
     const downloadAnchor = window.document.createElement('a');
     downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `${document.title}_Checklist.json`);
+    downloadAnchor.setAttribute("download", `${safeTitle}_Checklist.json`);
     window.document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
@@ -57,14 +58,16 @@ export const ChecklistTab: React.FC<ChecklistTabProps> = ({ document }) => {
         <div className="flex items-center space-x-2">
           <button
             onClick={handleCopyMarkdown}
-            className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center space-x-1.5 border border-slate-700 transition"
+            className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center space-x-1.5 border border-slate-700 transition focus-visible:ring-2 focus-visible:ring-blue-500"
+            aria-label="Copy checklist as Markdown"
           >
             {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
             <span>{copied ? 'Copied MD' : 'Copy Markdown'}</span>
           </button>
           <button
             onClick={handleExportJSON}
-            className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center space-x-1.5 transition shadow-md shadow-emerald-600/20"
+            className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center space-x-1.5 transition shadow-md shadow-emerald-600/20 focus-visible:ring-2 focus-visible:ring-emerald-400"
+            aria-label="Export checklist as JSON"
           >
             <Download className="w-4 h-4" />
             <span>Export JSON</span>
@@ -90,12 +93,12 @@ export const ChecklistTab: React.FC<ChecklistTabProps> = ({ document }) => {
       </div>
 
       {/* Timeline Checklist Items */}
-      <div className="space-y-3">
+      <div className="space-y-3" role="list" aria-label="Compliance checklist items">
         {deadlines.map((item) => (
           <div
             key={item.id}
-            onClick={() => toggleComplete(item.id)}
-            className={`glass-panel p-4 rounded-2xl border transition cursor-pointer flex items-start space-x-4 ${
+            role="listitem"
+            className={`glass-panel p-4 rounded-2xl border transition flex items-start space-x-4 ${
               item.isCompleted
                 ? 'border-slate-800 bg-slate-900/30 opacity-60'
                 : item.type === 'notice' || item.type === 'payment'
@@ -103,16 +106,26 @@ export const ChecklistTab: React.FC<ChecklistTabProps> = ({ document }) => {
                 : 'border-slate-700/80 bg-slate-900/80 hover:border-blue-500/50'
             }`}
           >
-            {/* Custom Checkbox */}
-            <div className={`w-6 h-6 rounded-lg border mt-0.5 flex items-center justify-center transition flex-shrink-0 ${
-              item.isCompleted
-                ? 'bg-emerald-600 border-emerald-500 text-white'
-                : 'border-slate-600 bg-slate-950 text-transparent hover:border-emerald-500'
-            }`}>
+            {/* Accessible Checkbox Toggle Button */}
+            <button
+              type="button"
+              role="checkbox"
+              aria-checked={item.isCompleted}
+              aria-label={`Mark "${item.title}" as ${item.isCompleted ? 'incomplete' : 'completed'}`}
+              onClick={() => toggleComplete(item.id)}
+              className={`w-6 h-6 rounded-lg border mt-0.5 flex items-center justify-center transition flex-shrink-0 focus-visible:ring-2 focus-visible:ring-emerald-500 ${
+                item.isCompleted
+                  ? 'bg-emerald-600 border-emerald-500 text-white'
+                  : 'border-slate-600 bg-slate-950 text-transparent hover:border-emerald-500'
+              }`}
+            >
               <Check className="w-4 h-4 stroke-[3]" />
-            </div>
+            </button>
 
-            <div className="flex-1 space-y-1">
+            <div 
+              className="flex-1 space-y-1 cursor-pointer"
+              onClick={() => toggleComplete(item.id)}
+            >
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <span className={`text-xs font-bold ${item.isCompleted ? 'line-through text-slate-500' : 'text-slate-100'}`}>

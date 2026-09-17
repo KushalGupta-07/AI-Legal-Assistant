@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Scale, Upload, Key, Sun, Moon, FileText, ChevronDown, Search } from 'lucide-react';
 import type { LegalDocument } from '../types/legal';
 
@@ -27,6 +27,17 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [docSearch, setDocSearch] = useState('');
+
+  useEffect(() => {
+    if (!dropdownOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setDropdownOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [dropdownOpen]);
 
   const filteredDocs = documents.filter(d => d.title.toLowerCase().includes(docSearch.toLowerCase()));
 
@@ -62,7 +73,10 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="relative">
           <button
             onClick={() => setDropdownOpen(!dropdownOpen)}
-            className="flex items-center space-x-2.5 bg-slate-800/90 hover:bg-slate-800 border border-slate-700/80 rounded-xl px-3.5 py-2 cursor-pointer transition shadow-md"
+            className="flex items-center space-x-2.5 bg-slate-800/90 hover:bg-slate-800 border border-slate-700/80 rounded-xl px-3.5 py-2 cursor-pointer transition shadow-md focus-visible:ring-2 focus-visible:ring-blue-500"
+            aria-expanded={dropdownOpen}
+            aria-haspopup="true"
+            aria-label="Select loaded document"
           >
             <FileText className="w-4 h-4 text-blue-400" />
             <div className="text-left max-w-[140px] sm:max-w-[200px] truncate">
@@ -78,7 +92,12 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Dropdown Menu */}
           {dropdownOpen && (
-            <div className="absolute right-0 top-full mt-2 w-80 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-3 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+            <div 
+              className="absolute right-0 top-full mt-2 w-80 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-3 z-50 animate-in fade-in slide-in-from-top-2 duration-150"
+              role="menu"
+              aria-orientation="vertical"
+              aria-label="Loaded contract list"
+            >
               <div className="flex items-center justify-between px-2 pb-2 border-b border-slate-800">
                 <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">
                   Loaded Contracts ({documents.length})
@@ -94,6 +113,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   value={docSearch}
                   onChange={(e) => setDocSearch(e.target.value)}
                   className="w-full bg-transparent text-xs text-slate-200 outline-none"
+                  aria-label="Filter documents by title"
                 />
               </div>
 
@@ -101,6 +121,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 {filteredDocs.map((doc) => (
                   <button
                     key={doc.id}
+                    role="menuitem"
                     onClick={() => {
                       onSelectDocument(doc);
                       setDropdownOpen(false);
@@ -127,7 +148,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     onOpenUpload();
                     setDropdownOpen(false);
                   }}
-                  className="w-full text-center py-2 text-xs text-blue-400 hover:text-blue-300 font-bold flex items-center justify-center space-x-1.5 bg-blue-500/10 hover:bg-blue-500/20 rounded-xl border border-blue-500/30 transition"
+                  className="w-full text-center py-2 text-xs text-blue-400 hover:text-blue-300 font-bold flex items-center justify-center space-x-1.5 bg-blue-500/10 hover:bg-blue-500/20 rounded-xl border border-blue-500/30 transition focus-visible:ring-2 focus-visible:ring-blue-500"
                 >
                   <Upload className="w-3.5 h-3.5" />
                   <span>Upload New Contract</span>
@@ -141,8 +162,9 @@ export const Navbar: React.FC<NavbarProps> = ({
         {activeDocument && (
           <button
             onClick={onOpenViewer}
-            className="p-2 rounded-xl bg-slate-800/90 hover:bg-slate-800 border border-slate-700/80 text-slate-300 hover:text-white transition flex items-center space-x-1.5 text-xs font-semibold"
+            className="p-2 rounded-xl bg-slate-800/90 hover:bg-slate-800 border border-slate-700/80 text-slate-300 hover:text-white transition flex items-center space-x-1.5 text-xs font-semibold focus-visible:ring-2 focus-visible:ring-blue-500"
             title="View Formatted Source Text"
+            aria-label="View formatted document source text"
           >
             <FileText className="w-4 h-4 text-emerald-400" />
             <span className="hidden md:inline">View Source</span>
@@ -152,7 +174,8 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Upload Button */}
         <button
           onClick={onOpenUpload}
-          className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500 hover:from-blue-500 hover:to-indigo-400 text-white font-bold text-xs transition flex items-center space-x-1.5 shadow-lg shadow-blue-600/30 hover:scale-[1.02] active:scale-95"
+          className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500 hover:from-blue-500 hover:to-indigo-400 text-white font-bold text-xs transition flex items-center space-x-1.5 shadow-lg shadow-blue-600/30 hover:scale-[1.02] active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-400"
+          aria-label="Upload contract"
         >
           <Upload className="w-4 h-4" />
           <span className="hidden sm:inline">Upload Contract</span>
@@ -161,12 +184,13 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Gemini API Key button */}
         <button
           onClick={onOpenApiKey}
-          className={`p-2 rounded-xl border transition flex items-center space-x-1.5 text-xs font-semibold ${
+          className={`p-2 rounded-xl border transition flex items-center space-x-1.5 text-xs font-semibold focus-visible:ring-2 focus-visible:ring-emerald-500 ${
             hasApiKey
               ? 'badge-glow-low text-emerald-300 hover:bg-emerald-500/30'
               : 'badge-glow-medium text-amber-300 hover:bg-amber-500/30'
           }`}
           title={hasApiKey ? 'Gemini Live AI Active' : 'Configure Gemini API Key'}
+          aria-label={hasApiKey ? 'Gemini Live AI Active' : 'Configure Gemini API Key'}
         >
           <Key className="w-4 h-4" />
           <span className="hidden lg:inline">{hasApiKey ? 'Gemini Live AI' : 'Set Gemini Key'}</span>
@@ -175,8 +199,9 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Theme Toggle */}
         <button
           onClick={onToggleTheme}
-          className="p-2 rounded-xl bg-slate-800/90 hover:bg-slate-800 border border-slate-700/80 text-slate-300 hover:text-white transition"
+          className="p-2 rounded-xl bg-slate-800/90 hover:bg-slate-800 border border-slate-700/80 text-slate-300 hover:text-white transition focus-visible:ring-2 focus-visible:ring-blue-500"
           title="Toggle Dark/Light Mode"
+          aria-label="Toggle dark and light theme"
         >
           {isDarkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-blue-400" />}
         </button>

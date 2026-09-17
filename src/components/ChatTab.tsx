@@ -9,13 +9,23 @@ interface ChatTabProps {
   onOpenViewer?: () => void;
 }
 
+function getFormattedTime(): string {
+  return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+let messageCounter = 0;
+function createUniqueId(prefix: string): string {
+  messageCounter += 1;
+  return `${prefix}-${messageCounter}-${Date.now()}`;
+}
+
 export const ChatTab: React.FC<ChatTabProps> = ({ document, apiKey, onOpenViewer }) => {
-  const [messages, setMessages] = useState<ChatMessage[]>([
+  const [messages, setMessages] = useState<ChatMessage[]>(() => [
     {
       id: 'welcome',
       sender: 'assistant',
       text: `Hello! I am LexiGuard AI. I am trained on "${document.title}". Ask me any question regarding terms, notice periods, financial obligations, or potential red flags!`,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      timestamp: getFormattedTime()
     }
   ]);
   const [inputQuery, setInputQuery] = useState('');
@@ -41,11 +51,12 @@ export const ChatTab: React.FC<ChatTabProps> = ({ document, apiKey, onOpenViewer
     const query = textToSend || inputQuery;
     if (!query.trim()) return;
 
+    const userTimestamp = getFormattedTime();
     const userMsg: ChatMessage = {
-      id: `user-${Date.now()}`,
+      id: createUniqueId('user'),
       sender: 'user',
       text: query,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      timestamp: userTimestamp
     };
 
     setMessages(prev => [...prev, userMsg]);
@@ -54,16 +65,17 @@ export const ChatTab: React.FC<ChatTabProps> = ({ document, apiKey, onOpenViewer
 
     try {
       const res = await chatWithDocument(document, messages, query, apiKey);
+      const botTimestamp = getFormattedTime();
       const botMsg: ChatMessage = {
-        id: `bot-${Date.now()}`,
+        id: createUniqueId('bot'),
         sender: 'assistant',
         text: res.text,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        timestamp: botTimestamp,
         citations: res.citations
       };
       setMessages(prev => [...prev, botMsg]);
     } catch (err) {
-      console.error(err);
+      console.error('Chat error:', err);
     } finally {
       setIsTyping(false);
     }
@@ -91,7 +103,8 @@ export const ChatTab: React.FC<ChatTabProps> = ({ document, apiKey, onOpenViewer
         {onOpenViewer && (
           <button
             onClick={onOpenViewer}
-            className="text-xs text-blue-400 hover:text-blue-300 font-semibold flex items-center space-x-1"
+            className="text-xs text-blue-400 hover:text-blue-300 font-semibold flex items-center space-x-1 focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
+            aria-label="View original source document"
           >
             <span>View Original Document</span>
             <ExternalLink className="w-3.5 h-3.5" />
@@ -100,7 +113,11 @@ export const ChatTab: React.FC<ChatTabProps> = ({ document, apiKey, onOpenViewer
       </div>
 
       {/* Messages Scroll Area */}
-      <div className="flex-1 p-5 overflow-y-auto space-y-4 bg-slate-950/40">
+      <div 
+        className="flex-1 p-5 overflow-y-auto space-y-4 bg-slate-950/40"
+        aria-live="polite"
+        aria-label="Chat conversation log"
+      >
         {messages.map((msg) => (
           <div
             key={msg.id}
@@ -140,7 +157,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ document, apiKey, onOpenViewer
         ))}
 
         {isTyping && (
-          <div className="flex items-center space-x-2 text-xs text-blue-400 font-semibold p-2">
+          <div className="flex items-center space-x-2 text-xs text-blue-400 font-semibold p-2" aria-status="loading">
             <RefreshCw className="w-4 h-4 animate-spin" />
             <span>LexiGuard AI searching document context...</span>
           </div>
@@ -156,7 +173,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ document, apiKey, onOpenViewer
           <button
             key={idx}
             onClick={() => handleSendMessage(prompt)}
-            className="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[11px] text-slate-300 flex-shrink-0 transition"
+            className="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[11px] text-slate-300 flex-shrink-0 transition focus-visible:ring-2 focus-visible:ring-blue-500"
           >
             {prompt}
           </button>
@@ -176,12 +193,14 @@ export const ChatTab: React.FC<ChatTabProps> = ({ document, apiKey, onOpenViewer
           value={inputQuery}
           onChange={(e) => setInputQuery(e.target.value)}
           placeholder="Ask anything about this document (e.g., 'What is my notice deadline?')..."
-          className="flex-1 bg-slate-950 border border-slate-700 focus:border-blue-500 rounded-xl px-4 py-2.5 text-xs text-slate-100 placeholder-slate-500 outline-none transition"
+          className="flex-1 bg-slate-950 border border-slate-700 focus:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500 rounded-xl px-4 py-2.5 text-xs text-slate-100 placeholder-slate-500 outline-none transition"
+          aria-label="Ask a question about the document"
         />
         <button
           type="submit"
           disabled={!inputQuery.trim() || isTyping}
-          className="p-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white transition shadow-md shadow-blue-600/20"
+          className="p-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white transition shadow-md shadow-blue-600/20 focus-visible:ring-2 focus-visible:ring-blue-400"
+          aria-label="Send query"
         >
           <Send className="w-4 h-4" />
         </button>

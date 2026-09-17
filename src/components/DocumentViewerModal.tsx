@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Copy, Check, Search, FileText, AlignLeft } from 'lucide-react';
 import type { LegalDocument } from '../types/legal';
 import { sanitizeToHumanReadableText } from '../services/pdfService';
@@ -17,6 +17,21 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [copied, setCopied] = useState(false);
 
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen || !document) return null;
 
   // Ensure content is sanitized into clean human readable text
@@ -30,7 +45,12 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 lg:p-8 bg-slate-950/80 backdrop-blur-md">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 lg:p-8 bg-slate-950/80 backdrop-blur-md"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="viewer-modal-title"
+    >
       <div className="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-4xl w-full h-[85vh] flex flex-col shadow-2xl relative overflow-hidden">
         {/* Header */}
         <div className="p-4 lg:p-6 border-b border-slate-800 flex items-center justify-between bg-slate-950/80">
@@ -39,7 +59,7 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
               <FileText className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-100">{document.title}</h3>
+              <h3 id="viewer-modal-title" className="text-base font-bold text-slate-100">{document.title}</h3>
               <p className="text-xs text-slate-400">
                 Human-Readable Source Viewer • {document.fileName} ({document.wordCount} words)
               </p>
@@ -49,14 +69,16 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
           <div className="flex items-center space-x-2">
             <button
               onClick={handleCopy}
-              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center space-x-1.5 border border-slate-700 transition"
+              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center space-x-1.5 border border-slate-700 transition focus-visible:ring-2 focus-visible:ring-blue-500"
+              aria-label="Copy all document text"
             >
               {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
               <span>{copied ? 'Copied Clean Text' : 'Copy All Text'}</span>
             </button>
             <button
               onClick={onClose}
-              className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
+              className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition focus-visible:ring-2 focus-visible:ring-blue-500"
+              aria-label="Close document viewer modal"
             >
               <X className="w-5 h-5" />
             </button>
@@ -72,7 +94,8 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
               placeholder="Search document text..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-transparent text-xs text-slate-200 placeholder-slate-500 outline-none"
+              className="w-full bg-transparent text-xs text-slate-200 placeholder-slate-500 outline-none focus-visible:ring-1 focus-visible:ring-blue-500 rounded px-1"
+              aria-label="Search document text"
             />
           </div>
 

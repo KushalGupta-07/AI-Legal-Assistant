@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Upload, FileText, Sparkles, AlertCircle } from 'lucide-react';
 import type { LegalDocument } from '../types/legal';
 import { SAMPLE_DOCUMENTS } from '../services/sampleDocuments';
@@ -12,6 +12,8 @@ interface DocumentUploadModalProps {
   apiKey?: string;
 }
 
+const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
+
 export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   isOpen,
   onClose,
@@ -22,18 +24,38 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const handleFileUpload = async (file: File) => {
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      setErrorMessage(`File "${file.name}" exceeds the 25MB maximum size limit.`);
+      return;
+    }
+
     setIsProcessing(true);
     setErrorMessage(null);
     try {
       const text = await extractTextFromFile(file);
       if (!text || text.trim().length < 20) {
-        throw new Error('Unable to extract text content from file.');
+        throw new Error('Unable to extract readable text content from file.');
       }
 
-      const wordCount = text.split(/\s+/).length;
+      const wordCount = text.split(/\s+/).filter(Boolean).length;
       const analysis = await analyzeDocument(text, file.name, apiKey);
 
       const newDoc: LegalDocument = {
@@ -50,9 +72,10 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
       onDocumentAdded(newDoc);
       setIsProcessing(false);
       onClose();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setErrorMessage(err?.message || 'Failed to parse document. Please check file format.');
+      const msg = err instanceof Error ? err.message : 'Failed to parse document. Please check file format.';
+      setErrorMessage(msg);
       setIsProcessing(false);
     }
   };
@@ -86,12 +109,18 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="upload-modal-title"
+    >
       <div className="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-2xl w-full p-6 shadow-2xl relative">
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
+          className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition focus-visible:ring-2 focus-visible:ring-blue-500"
+          aria-label="Close document upload modal"
         >
           <X className="w-5 h-5" />
         </button>
@@ -102,14 +131,14 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
             <Upload className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-lg font-bold text-slate-100">Upload Legal Document</h3>
+            <h3 id="upload-modal-title" className="text-lg font-bold text-slate-100">Upload Legal Document</h3>
             <p className="text-xs text-slate-400">Upload your PDF, DOCX, or TXT contracts, or select a pre-loaded sample dataset</p>
           </div>
         </div>
 
         {/* Error Alert */}
         {errorMessage && (
-          <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs flex items-center space-x-2">
+          <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs flex items-center space-x-2" role="alert">
             <AlertCircle className="w-4 h-4 flex-shrink-0" />
             <span>{errorMessage}</span>
           </div>
@@ -128,10 +157,11 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         >
           <input
             type="file"
-            accept=".pdf,.txt,.docx,.md"
+            accept=".pdf,.txt,.docx,.md,.json"
             onChange={handleFileSelect}
             className="absolute inset-0 opacity-0 cursor-pointer"
             disabled={isProcessing}
+            aria-label="Choose file to upload"
           />
           {isProcessing ? (
             <div className="py-4 space-y-3">
@@ -167,7 +197,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
               <button
                 key={sample.id}
                 onClick={() => handleSelectPreset(sample)}
-                className="p-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 hover:border-blue-500/50 text-left transition group"
+                className="p-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 hover:border-blue-500/50 text-left transition group focus-visible:ring-2 focus-visible:ring-blue-500"
               >
                 <div className="flex items-start justify-between">
                   <FileText className="w-4 h-4 text-blue-400 group-hover:text-blue-300" />

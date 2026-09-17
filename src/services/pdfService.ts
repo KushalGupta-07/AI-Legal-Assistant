@@ -1,13 +1,7 @@
-import * as pdfjsLib from 'pdfjs-dist';
-import mammoth from 'mammoth';
-
-// Fixed reliable worker URL matching pdfjs-dist 3.x API
-if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-}
-
+/* eslint-disable no-control-regex */
 /**
  * Extracts 100% human-readable text from uploaded files (PDF, DOCX, TXT, MD).
+ * Uses dynamic imports for pdfjs-dist and mammoth to optimize initial bundle size.
  */
 export async function extractTextFromFile(file: File): Promise<string> {
   const extension = file.name.split('.').pop()?.toLowerCase();
@@ -18,9 +12,11 @@ export async function extractTextFromFile(file: File): Promise<string> {
     return sanitizeToHumanReadableText(raw);
   }
 
-  // 2. DOCX Word Documents (using mammoth)
+  // 2. DOCX Word Documents (using mammoth loaded lazily)
   if (extension === 'docx' || extension === 'doc') {
     try {
+      const mammothModule = await import('mammoth');
+      const mammoth = mammothModule.default || mammothModule;
       const arrayBuffer = await file.arrayBuffer();
       const result = await mammoth.extractRawText({ arrayBuffer });
       if (result.value && result.value.trim().length > 20) {
@@ -31,9 +27,13 @@ export async function extractTextFromFile(file: File): Promise<string> {
     }
   }
 
-  // 3. PDF Files (using PDF.js with fallback)
+  // 3. PDF Files (using PDF.js loaded lazily)
   if (extension === 'pdf') {
     try {
+      const pdfjsLib = await import('pdfjs-dist');
+      if (typeof window !== 'undefined' && pdfjsLib.GlobalWorkerOptions) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      }
       const buffer = await file.arrayBuffer();
       const loadingTask = pdfjsLib.getDocument({
         data: new Uint8Array(buffer),
@@ -50,18 +50,20 @@ export async function extractTextFromFile(file: File): Promise<string> {
         let lastY: number | null = null;
         let pageText = '';
 
-        for (const item of textContent.items as any[]) {
+        for (const item of textContent.items as Array<{ str?: string; transform?: number[] }>) {
           if (!item.str) continue;
 
           // Detect line breaks from vertical layout coordinate changes
-          if (lastY !== null && Math.abs(item.transform[5] - lastY) > 8) {
+          if (lastY !== null && item.transform && Math.abs(item.transform[5] - lastY) > 8) {
             pageText += '\n';
           } else if (pageText.length > 0 && !pageText.endsWith(' ') && !pageText.endsWith('\n')) {
             pageText += ' ';
           }
 
           pageText += item.str;
-          lastY = item.transform[5];
+          if (item.transform) {
+            lastY = item.transform[5];
+          }
         }
 
         if (pageText.trim().length > 0) {
@@ -113,10 +115,10 @@ function extractPdfTextFromStream(pdfRaw: string): string {
 
   // Match text in parentheses before Tj or TJ operator
   const tjRegex = /\(([^()]{2,})\)\s*T[jJ]/g;
-  let match;
+  let match: RegExpExecArray | null;
   while ((match = tjRegex.exec(pdfRaw)) !== null) {
     const token = match[1].replace(/\\([()])/g, '$1');
-    if (token.trim().length > 0 && /^[\x20-\x7E]+$/.test(token)) {
+    if (token.trim().length > 0 && /^[^\u0000-\u001F]+$/.test(token)) {
       textParts.push(token);
     }
   }
@@ -129,7 +131,7 @@ function extractPdfTextFromStream(pdfRaw: string): string {
     if (subMatches) {
       const line = subMatches
         .map(s => s.slice(1, -1).replace(/\\([()])/g, '$1'))
-        .filter(s => s.trim().length > 0 && /^[\x20-\x7E]+$/.test(s))
+        .filter(s => s.trim().length > 0 && /^[^\u0000-\u001F]+$/.test(s))
         .join('');
       if (line.length > 0) {
         textParts.push(line);
@@ -141,7 +143,7 @@ function extractPdfTextFromStream(pdfRaw: string): string {
 }
 
 /**
- * Sanitizes any raw file text into clean, 100% human-readable English text.
+ * Sanitizes any raw file text into clean, 100% human-readable text.
  */
 export function sanitizeToHumanReadableText(rawInput: string): string {
   if (!rawInput) return '';
@@ -153,11 +155,11 @@ export function sanitizeToHumanReadableText(rawInput: string): string {
   text = text.replace(/\d+\s+\d+\s+obj[\s\S]*?endobj/gi, ' ');
   text = text.replace(/%PDF-\d\.\d[\s\S]*?%/gi, ' ');
   text = text.replace(/PK\x03\x04[\s\S]*?/gi, ' ');
-  text = text.replace(/[\x00-\x09\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, ' ');
+  text = text.replace(/[\u0000-\u0009\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, ' ');
 
   const tokens = text.split(/\s+/).filter(token => {
     if (token.length > 30) return false;
-    if (/^[\x20-\x7E]+$/.test(token)) return true;
+    if (/^[^\u0000-\u001F]+$/.test(token)) return true;
     return false;
   });
 

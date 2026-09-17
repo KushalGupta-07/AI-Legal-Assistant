@@ -1,3 +1,4 @@
+/* eslint-disable no-control-regex */
 import { GoogleGenAI } from '@google/genai';
 import type { 
   LegalDocument, 
@@ -15,8 +16,16 @@ import type {
 // Initialize Gemini Client if key exists
 function getGeminiClient(apiKey?: string): GoogleGenAI | null {
   const key = apiKey || localStorage.getItem('GEMINI_API_KEY') || import.meta.env.VITE_GEMINI_API_KEY;
-  if (!key) return null;
-  return new GoogleGenAI({ apiKey: key });
+  if (!key || !key.trim()) return null;
+  return new GoogleGenAI({ apiKey: key.trim() });
+}
+
+/**
+ * Sanitizes input prompt text to prevent control character corruption.
+ */
+function sanitizePromptInput(input: string): string {
+  if (!input) return '';
+  return input.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, ' ').trim();
 }
 
 /**
@@ -24,11 +33,13 @@ function getGeminiClient(apiKey?: string): GoogleGenAI | null {
  */
 export async function analyzeDocument(text: string, title: string = 'Uploaded Legal Document', apiKey?: string): Promise<DocumentAnalysis> {
   const ai = getGeminiClient(apiKey);
+  const cleanTitle = sanitizePromptInput(title);
+  const cleanText = sanitizePromptInput(text);
   
   if (ai) {
     try {
       const prompt = `You are LexiGuard AI, an expert legal contract analysis engine.
-Analyze the following legal document text (${title}) and return ONLY a strict JSON object with this exact schema:
+Analyze the following legal document text (${cleanTitle}) and return ONLY a strict JSON object with this exact schema:
 
 {
   "executiveSummary": "Concise 2-3 sentence high-level summary of the contract.",
@@ -87,7 +98,7 @@ Analyze the following legal document text (${title}) and return ONLY a strict JS
 }
 
 Document Text:
-${text.slice(0, 12000)}`;
+${cleanText.slice(0, 12000)}`;
 
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
@@ -100,7 +111,9 @@ ${text.slice(0, 12000)}`;
       const responseText = response.text;
       if (responseText) {
         const parsed = JSON.parse(responseText);
-        return parsed as DocumentAnalysis;
+        if (parsed.executiveSummary && Array.isArray(parsed.clauses)) {
+          return parsed as DocumentAnalysis;
+        }
       }
     } catch (err) {
       console.warn('Gemini API call failed, using intelligent local parser:', err);
@@ -108,7 +121,7 @@ ${text.slice(0, 12000)}`;
   }
 
   // Fallback Heuristic Legal Analysis Parser
-  return parseDocumentLocally(text);
+  return parseDocumentLocally(cleanText);
 }
 
 /**
@@ -227,7 +240,7 @@ function parseDocumentLocally(text: string): DocumentAnalysis {
     });
   }
 
-  const wordCount = text.split(/\s+/).length;
+  const wordCount = text.split(/\s+/).filter(Boolean).length || 1;
   const isHighRisk = highestRisk === ('high' as RiskLevel);
 
   return {
@@ -268,11 +281,11 @@ export async function compareDocuments(doc1: LegalDocument, doc2: LegalDocument,
   if (ai) {
     try {
       const prompt = `Compare these two legal documents and generate a JSON response comparing their clauses, risk changes, added/deleted clauses:
-Document 1 (${doc1.title}):
-${doc1.content.slice(0, 6000)}
+Document 1 (${sanitizePromptInput(doc1.title)}):
+${sanitizePromptInput(doc1.content).slice(0, 6000)}
 
-Document 2 (${doc2.title}):
-${doc2.content.slice(0, 6000)}
+Document 2 (${sanitizePromptInput(doc2.title)}):
+${sanitizePromptInput(doc2.content).slice(0, 6000)}
 
 JSON Schema:
 {
@@ -374,20 +387,21 @@ export async function chatWithDocument(
   apiKey?: string
 ): Promise<{ text: string; citations: { section: string; snippet: string }[] }> {
   const ai = getGeminiClient(apiKey);
+  const cleanQuery = sanitizePromptInput(query);
 
   if (ai) {
     try {
-      const formattedHistory = history.slice(-6).map(h => `${h.sender.toUpperCase()}: ${h.text}`).join('\n');
+      const formattedHistory = history.slice(-6).map(h => `${h.sender.toUpperCase()}: ${sanitizePromptInput(h.text)}`).join('\n');
       const prompt = `You are LexiGuard AI Legal Assistant. Answer the user's question accurately based strictly on the provided legal document context. Always cite exact sections or quotes when available. Always clarify that this is general legal information, not formal attorney advice.
 
-Document Title: ${doc.title}
+Document Title: ${sanitizePromptInput(doc.title)}
 Document Text:
-${doc.content.slice(0, 10000)}
+${sanitizePromptInput(doc.content).slice(0, 10000)}
 
 Recent Chat History:
 ${formattedHistory}
 
-USER QUESTION: ${query}
+USER QUESTION: ${cleanQuery}
 
 Provide a helpful, precise answer with relevant citations. Format response in JSON:
 {
@@ -412,7 +426,7 @@ Provide a helpful, precise answer with relevant citations. Format response in JS
   }
 
   // Fallback intelligent query analyzer
-  const lowQ = query.toLowerCase();
+  const lowQ = cleanQuery.toLowerCase();
   const citations: { section: string; snippet: string }[] = [];
 
   let text = `Based on my analysis of "${doc.title}":\n\n`;
@@ -456,7 +470,7 @@ Provide a helpful, precise answer with relevant citations. Format response in JS
       text += `No critical high-risk red flags were found, but review obligations carefully.`;
     }
   } else {
-    text += `I searched "${doc.title}" regarding your query ("${query}").\n\n`;
+    text += `I searched "${doc.title}" regarding your query ("${cleanQuery}").\n\n`;
     text += `The document contains ${doc.wordCount} words across key sections covering rights, responsibilities, and procedural timelines. `;
     if (doc.analysis?.executiveSummary) {
       text += `\n\n**Summary Context**: ${doc.analysis.executiveSummary}`;
@@ -487,13 +501,13 @@ export async function generateLawyerBrief(doc: LegalDocument, apiKey?: string): 
   if (ai) {
     try {
       const prompt = `Generate a comprehensive "Attorney Consultation Brief" for a client to bring to their lawyer regarding this document:
-Title: ${doc.title}
-Text: ${doc.content.slice(0, 8000)}
+Title: ${sanitizePromptInput(doc.title)}
+Text: ${sanitizePromptInput(doc.content).slice(0, 8000)}
 
 Return strictly JSON matching this structure:
 {
   "documentId": "${doc.id}",
-  "documentTitle": "${doc.title}",
+  "documentTitle": "${sanitizePromptInput(doc.title)}",
   "generatedDate": "${new Date().toISOString().split('T')[0]}",
   "executiveBrief": "Clear background for the legal professional.",
   "keyRedFlags": ["Red flag 1", "Red flag 2"],
@@ -533,7 +547,9 @@ Return strictly JSON matching this structure:
   }
 
   // Local Brief Generator
-  const highRiskClauses = doc.analysis?.clauses.filter(c => c.riskLevel === 'high') || [];
+  const analysis = doc.analysis || parseDocumentLocally(doc.content);
+  const highRiskClauses = analysis.clauses.filter(c => c.riskLevel === 'high');
+  const targetClauses = highRiskClauses.length > 0 ? highRiskClauses : analysis.clauses;
 
   return {
     documentId: doc.id,
@@ -545,13 +561,13 @@ Return strictly JSON matching this structure:
       : ['Review strict notice windows and obligation penalties.'],
     criticalQuestions: [
       {
-        section: highRiskClauses[0]?.section || 'Section 5 (Liability)',
+        section: targetClauses[0]?.section || 'Section 5 (Liability)',
         question: 'Can we negotiate a liability cap or eliminate personal officer guarantees completely?',
         whyItMatters: 'Personal assets are currently exposed to corporate lease debt without ceiling caps.',
         priority: 'High'
       },
       {
-        section: highRiskClauses[1]?.section || 'Section 4 (Renewal)',
+        section: targetClauses[1]?.section || 'Section 4 (Renewal)',
         question: 'How can we revise the auto-renewal clause to prevent accidental 5-year lock-in if notice is delayed?',
         whyItMatters: 'The current 30-day notice window (90-120 days prior) poses high accidental default risk.',
         priority: 'High'
@@ -563,7 +579,7 @@ Return strictly JSON matching this structure:
         priority: 'Medium'
       }
     ],
-    recommendedAmendments: highRiskClauses.slice(0, 2).map(c => ({
+    recommendedAmendments: targetClauses.slice(0, 2).map(c => ({
       section: c.section,
       clauseTitle: c.title,
       currentLanguage: c.originalText,

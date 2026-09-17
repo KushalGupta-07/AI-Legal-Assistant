@@ -21,18 +21,18 @@ export const LawyerPrepTab: React.FC<LawyerPrepTabProps> = ({ document, apiKey }
         const res = await generateLawyerBrief(document, apiKey);
         if (isMounted) setBrief(res);
       } catch (err) {
-        console.error(err);
+        console.error('Failed to generate attorney brief:', err);
       } finally {
         if (isMounted) setLoading(false);
       }
     };
     fetchBrief();
     return () => { isMounted = false; };
-  }, [document.id, apiKey]);
+  }, [document, apiKey]);
 
   if (loading) {
     return (
-      <div className="p-16 text-center space-y-4">
+      <div className="p-16 text-center space-y-4" role="status">
         <RefreshCw className="w-8 h-8 text-blue-400 animate-spin mx-auto" />
         <p className="text-sm font-semibold text-slate-200">Preparing Attorney Consultation Brief...</p>
         <p className="text-xs text-slate-400">Synthesizing red flags, targeted questions, and redline amendments</p>
@@ -80,14 +80,16 @@ export const LawyerPrepTab: React.FC<LawyerPrepTabProps> = ({ document, apiKey }
         <div className="flex items-center space-x-2">
           <button
             onClick={handleCopyMarkdown}
-            className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center space-x-1.5 border border-slate-700 transition"
+            className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center space-x-1.5 border border-slate-700 transition focus-visible:ring-2 focus-visible:ring-blue-500"
+            aria-label="Copy brief as Markdown"
           >
             {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
             <span>{copied ? 'Copied Brief' : 'Copy Brief Markdown'}</span>
           </button>
           <button
             onClick={handlePrint}
-            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center space-x-1.5 transition shadow-lg shadow-blue-600/20"
+            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center space-x-1.5 transition shadow-lg shadow-blue-600/20 focus-visible:ring-2 focus-visible:ring-blue-400"
+            aria-label="Print attorney memo"
           >
             <Printer className="w-4 h-4" />
             <span>Print Attorney Memo</span>
